@@ -6,6 +6,7 @@ services:
     environment:
       - CHLORIA_API_KEY=${CHLORIA_API_KEY}
       - CHLORIA_API_SECRET=${CHLORIA_API_SECRET}
+      - CRYSTAL_LOG_LEVEL=info
     volumes:
       - ../:/usr/src/crystal/
     tty: true
