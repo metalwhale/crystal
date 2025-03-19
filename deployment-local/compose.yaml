@@ -1,0 +1,9 @@
+services:
+  crystal_ai:
+    build:
+      context: ../crystal_ai/
+      dockerfile: Dockerfile.local
+    volumes:
+      - ../:/usr/local/src/crystal/
+    tty: true
+    working_dir: /usr/local/src/crystal/crystal_ai/

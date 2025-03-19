@@ -1,0 +1,4 @@
+FROM python:3.13.1-bookworm
+
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
