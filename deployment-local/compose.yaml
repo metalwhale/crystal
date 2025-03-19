@@ -9,5 +9,7 @@ services:
       - CRYSTAL_LOG_LEVEL=info
     volumes:
       - ../:/usr/src/crystal/
+    entrypoint: []
+    command: ["/bin/bash"]
     tty: true
     working_dir: /usr/src/crystal/crystal/
