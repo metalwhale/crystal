@@ -1,8 +1,33 @@
 services:
+  #############
+  # llama.cpp
+  #############
+  llamacpp-init:
+    build:
+      context: ../llamacpp-init/
+      dockerfile: Dockerfile.local
+    volumes:
+      - ../storage/models/:/usr/local/src/crystal/storage/models/
+    command: ["/usr/local/src/download_model.sh", "/usr/local/src/crystal/storage/models/model.gguf"]
+  llamacpp-server:
+    image: ghcr.io/ggml-org/llama.cpp:server-b4927
+    depends_on:
+      llamacpp-init:
+        condition: service_completed_successfully
+    volumes:
+      - ../storage/models/:/usr/local/src/crystal/storage/models/:ro
+    command: ["-m", "/usr/local/src/crystal/storage/models/model.gguf", "--temp", "0", "--port", "8080"]
+  ###########
+  # Crystal
+  ###########
   crystal-ai:
     build:
       context: ../crystal-ai/
       dockerfile: Dockerfile.local
+    environment:
+      - CHLORIA_API_KEY=${CHLORIA_API_KEY}
+      - CHLORIA_API_SECRET=${CHLORIA_API_SECRET}
+      - CRYSTAL_LOG_LEVEL=info
     volumes:
       - ../:/usr/local/src/crystal/
     tty: true
