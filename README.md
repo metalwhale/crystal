@@ -76,7 +76,7 @@ Download models:
 ```bash
 cd ../storage/
 mkdir -p models
-../llamacpp-init/download_model.sh ${PWD}/models/model.gguf
+curl https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/8c2fd26/Qwen2.5-7B-Instruct-Q4_K_M.gguf -L -o ${PWD}/models/model.gguf
 ```
 
 Start the llama.cpp [server](https://github.com/ggml-org/llama.cpp/blob/b4927/examples/server/README.md):

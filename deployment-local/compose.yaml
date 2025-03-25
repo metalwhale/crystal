@@ -3,12 +3,13 @@ services:
   # llama.cpp
   #############
   llamacpp-init:
-    build:
-      context: ../llamacpp-init/
-      dockerfile: Dockerfile.local
+    image: curlimages/curl:8.12.1
     volumes:
+      - ../llamacpp-init/:/usr/local/src/crystal/llamacpp-init/:ro
       - ../storage/models/:/usr/local/src/crystal/storage/models/
-    command: ["/usr/local/src/download_model.sh", "/usr/local/src/crystal/storage/models/model.gguf"]
+    entrypoint: []
+    # Use a small model in local environment
+    command: ["/usr/local/src/crystal/llamacpp-init/download_model.sh", "https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF/resolve/21ef230/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf", "/usr/local/src/crystal/storage/models/model.gguf"]
   llamacpp-server:
     image: ghcr.io/ggml-org/llama.cpp:server-b4927
     depends_on:
