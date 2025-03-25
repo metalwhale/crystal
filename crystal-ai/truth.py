@@ -1,5 +1,5 @@
 import logging
-import os
+import sys
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -8,10 +8,10 @@ from crystal_truth.data import generate_truths, get_origin_news
 
 def main():
     logging.basicConfig()
-    DATA_DIR = Path(__file__).parent.parent / "storage" / "data"
+    data_dir = Path(sys.argv[1])
     today = date.today()
-    get_origin_news(DATA_DIR, (today, today + timedelta(days=1)))
-    generate_truths(DATA_DIR, (today, today + timedelta(days=1)))
+    get_origin_news(data_dir, (today, today + timedelta(days=1)))
+    generate_truths(data_dir, (today, today + timedelta(days=1)))
 
 
 if __name__ == "__main__":
