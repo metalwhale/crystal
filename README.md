@@ -80,8 +80,8 @@ source $HOME/.local/bin/env
 ```
 
 ### 2. Run the program
-Run:
+Generate truths:
 ```bash
 uv sync
-uv run main.py
+uv run truth.py ../storage/data/
 ```

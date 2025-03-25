@@ -28,6 +28,7 @@ services:
     environment:
       - CHLORIA_API_KEY=${CHLORIA_API_KEY}
       - CHLORIA_API_SECRET=${CHLORIA_API_SECRET}
+      - LLAMACPP_SERVER_ROOT_ENDPOINT=http://llamacpp_server:8080
       - CRYSTAL_LOG_LEVEL=info
     volumes:
       - ../:/usr/local/src/crystal/
