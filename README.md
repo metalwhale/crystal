@@ -96,5 +96,5 @@ uv sync
 
 #### 3.2.2. Generate truths
 ```bash
-nohup uv run truth.py &
+nohup uv run truth.py ../storage/data/ &
 ```

@@ -2,9 +2,11 @@ import csv
 import json
 import logging
 import os
+import time
 from datetime import date, timedelta
 from pathlib import Path
 
+import openai
 import requests
 
 _ORIGIN_SUBDIR_NAME = "origin"
@@ -42,16 +44,34 @@ def get_origin_news(data_dir: os.PathLike, date_range: tuple[date, date]):
 
 
 def generate_truths(data_dir: os.PathLike, date_range: tuple[date, date]):
+    llamacpp_root_endpoint = os.environ["LLAMACPP_SERVER_ROOT_ENDPOINT"]
+    MAX_TRIES = 50
+    try_count = 0
+    while True:
+        try:
+            try_count += 1
+            # Doc: https://github.com/ggml-org/llama.cpp/blob/b4927/examples/server/README.md#api-endpoints
+            response = requests.get(f"{llamacpp_root_endpoint}/health")
+            if response.status_code == 200:
+                break
+        except:
+            pass
+        time.sleep(10)
+        if try_count == MAX_TRIES:
+            exit(0)
     os.makedirs(data_dir / _TRUTH_SUBDIR_NAME, exist_ok=True)
     PROMPT_FILE_PATH = Path(__file__).parent / "prompts" / "extract_fields.md"
     start_date, end_date = date_range
     prompt = ""
     with open(PROMPT_FILE_PATH) as prompt_file:
         prompt = prompt_file.read()
+    llamacpp_client = openai.OpenAI(
+        base_url=f"{llamacpp_root_endpoint}/v1",
+        api_key="no-key",
+    )
     prompt = prompt.replace("${YEAR}", str(date.today().year))
     for day_delta in range((end_date - start_date).days):
         cur_date = start_date + timedelta(days=day_delta)
-        _logger.info(f"Generating truth: cur_date={cur_date}")
         truth_file_path = data_dir / _TRUTH_SUBDIR_NAME / f"{cur_date}.csv"
         if os.path.isfile(truth_file_path):
             continue
@@ -66,6 +86,19 @@ def generate_truths(data_dir: os.PathLike, date_range: tuple[date, date]):
             for news in origin_reader:
                 # Ref: https://github.com/metalwhale/chloria/blob/main/chloria-backend/chloria-api/src/execution/ports/repository.rs
                 article_id, text = news["article_id"], news["text"]
+                if text == "":
+                    continue
+                _logger.info(f"Generating truth: cur_date={cur_date}, article_id={article_id}")
                 news_prompt = prompt.replace("${CONTENT}", text)
-                truth_writer.writerow({"article_id": article_id, "fields": "{}"})
+                completion = llamacpp_client.chat.completions.create(
+                    model="",
+                    messages=[
+                        {"role": "system", "content": "You are Crystal, an AI assistant."},
+                        {"role": "user", "content": news_prompt},
+                    ],
+                    # TODO: Choose appropriate values
+                    max_tokens=os.environ.get("LLAMACPP_MAX_TOKENS", None),
+                )
+                choice_content = completion.choices[0].message.content
+                truth_writer.writerow({"article_id": article_id, "fields": choice_content})
                 truth_file.flush()
