@@ -98,3 +98,15 @@ uv sync
 ```bash
 nohup uv run truth.py ../storage/data/ &
 ```
+
+#### 3.2.3. Train models
+Prerequisites:
+```bash
+sudo apt-get update -y
+sudo apt-get install -y build-essential
+```
+
+Run the script:
+```bash
+nohup uv run train.py &
+```

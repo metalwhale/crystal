@@ -22,6 +22,7 @@ services:
   # Crystal
   ###########
   crystal_ai:
+    platform: linux/amd64
     build:
       context: ../crystal_ai/
       dockerfile: Dockerfile.local
