@@ -60,7 +60,7 @@ Change to [`crystal_ai`](./crystal_ai/) directory:
 cd ../crystal_ai/
 ```
 
-<details><summary>Run the llama.cpp server (only for <a href="#322-generate-truths">generating truths</a>)</summary>
+<details><summary>Run the llama.cpp server (only for <a href="#322-generate-data">generating data</a>)</summary>
 
 Open another terminal and change to [`deployment-remote`](./deployment-remote/) directory:
 ```bash
@@ -91,22 +91,20 @@ curl http://localhost:8080/v1/chat/completions -H "Content-Type: application/jso
 ### 3.2. Run the program
 #### 3.2.1. Install packages
 ```bash
+# Prerequisites
+sudo apt-get update -y
+sudo apt-get install -y build-essential
+
 uv sync
 ```
 
-#### 3.2.2. Generate truths
+#### 3.2.2. Generate data
 ```bash
-nohup uv run truth.py ../storage/data/ &
+# Choose appropriate values for environment variables
+LLAMACPP_MAX_TOKENS=512 nohup uv run main.py data summarization ../storage/ &
 ```
 
 #### 3.2.3. Train models
-Prerequisites:
 ```bash
-sudo apt-get update -y
-sudo apt-get install -y build-essential
-```
-
-Run the script:
-```bash
-nohup uv run train.py &
+nohup uv run main.py train summarization ../storage/ &
 ```
