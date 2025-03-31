@@ -7,7 +7,7 @@ CRySTAL: Condensed Reinforcement using Structured Training for Adaptive Learning
 - Adaptive Learning: Adjusting the model to focus on a specific use case instead of general use
 
 ## 2. Data
-Use the data collected from https://github.com/metalwhale/chloria
+- [Extraction](./crystal-ai/crystal_extraction/) and [summarization](./crystal-ai/crystal_summarization/) tasks: Use the data collected from https://github.com/metalwhale/chloria
 
 ## 3. Deployment
 ### 3.1. Set up the environment
@@ -60,7 +60,7 @@ Change to [`crystal-ai`](./crystal-ai/) directory:
 cd ../crystal-ai/
 ```
 
-<details><summary>Run the llama.cpp server (only for <a href="#322-generate-truths">generating truths</a>)</summary>
+<details><summary>Run the llama.cpp server (only for <a href="#322-generate-data">generating data</a>)</summary>
 
 Open another terminal and change to [`deployment-remote`](./deployment-remote/) directory:
 ```bash
@@ -89,24 +89,36 @@ curl http://localhost:8080/v1/chat/completions -H "Content-Type: application/jso
 </details>
 
 ### 3.2. Run the program
-#### 3.2.1. Install packages
-```bash
-uv sync
-```
-
-#### 3.2.2. Generate truths
-```bash
-nohup uv run truth.py ../storage/data/ &
-```
-
-#### 3.2.3. Train models
-Prerequisites:
+#### 3.2.1. Prerequisites
+Install packages:
 ```bash
 sudo apt-get update -y
 sudo apt-get install -y build-essential
+
+uv sync
 ```
 
-Run the script:
+Activate the virtual environment:
 ```bash
-nohup uv run train.py &
+source ./.venv/bin/activate
+```
+
+Change to [`storage`](./storage/) directory:
+```bash
+cd ../storage/
+```
+
+#### 3.2.2. Generate data
+```bash
+nohup uv run ../crystal-ai/main.py data summarization ./ 2025-04-07 &
+```
+
+#### 3.2.3. Train models
+```bash
+nohup uv run ../crystal-ai/main.py train summarization ./ &
+```
+
+#### 3.2.4. Evaluate models
+```bash
+nohup uv run ../crystal-ai/main.py eval summarization ./ ./train/summarization/${TASK_SUBDIR}/lora &
 ```
