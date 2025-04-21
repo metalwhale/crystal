@@ -15,23 +15,23 @@ _logger = logging.getLogger(__name__)
 
 
 def generate_datasets(
-    data_dir: os.PathLike,
+    task_data_dir: os.PathLike,
     train_dataset_dir: os.PathLike,
     val_dataset_dir: os.PathLike,
     test_dataset_dir: os.PathLike,
     date_range: tuple[date, date],
 ):
-    _download_origin_data(data_dir, date_range)
-    _generate_datasets(data_dir, train_dataset_dir, val_dataset_dir, test_dataset_dir, date_range)
+    _download_origin_data(task_data_dir, date_range)
+    _generate_datasets(task_data_dir, train_dataset_dir, val_dataset_dir, test_dataset_dir, date_range)
 
 
-def _download_origin_data(data_dir: os.PathLike, date_range: tuple[date, date]):
-    os.makedirs(data_dir / _ORIGIN_SUBDIR_NAME, exist_ok=True)
+def _download_origin_data(task_data_dir: os.PathLike, date_range: tuple[date, date]):
+    os.makedirs(task_data_dir / _ORIGIN_SUBDIR_NAME, exist_ok=True)
     CHLORIA_API_ROOT_ENDPOINT = "https://chloria.wave.metalwhale.dev/api"
     start_date, end_date = date_range
     for day_delta in range((end_date - start_date).days):
         cur_date = start_date + timedelta(days=day_delta)
-        origin_file_path = data_dir / _ORIGIN_SUBDIR_NAME / f"{cur_date}.csv"
+        origin_file_path = task_data_dir / _ORIGIN_SUBDIR_NAME / f"{cur_date}.csv"
         if os.path.isfile(origin_file_path):
             continue
         _logger.info(f"Downloading origin news: cur_date={cur_date}")
@@ -55,7 +55,7 @@ def _download_origin_data(data_dir: os.PathLike, date_range: tuple[date, date]):
 
 
 def _generate_datasets(
-    data_dir: os.PathLike,
+    task_data_dir: os.PathLike,
     train_dataset_dir: os.PathLike,
     val_dataset_dir: os.PathLike,
     test_dataset_dir: os.PathLike,
@@ -65,7 +65,7 @@ def _generate_datasets(
     start_date, end_date = date_range
     for day_delta in range((end_date - start_date).days):
         cur_date = start_date + timedelta(days=day_delta)
-        origin_file_path = data_dir / _ORIGIN_SUBDIR_NAME / f"{cur_date}.csv"
+        origin_file_path = task_data_dir / _ORIGIN_SUBDIR_NAME / f"{cur_date}.csv"
         if not os.path.isfile(origin_file_path):
             _logger.warning(f"News file not found: cur_date={cur_date}")
             continue

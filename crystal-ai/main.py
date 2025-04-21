@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 SUMMARIZATION_TASK = "summarization"
+CHATBOT_TASK = "chatbot"
 
 
 def main():
@@ -20,10 +21,10 @@ def main():
     os.makedirs(val_dataset_dir, exist_ok=True)
     os.makedirs(test_dataset_dir, exist_ok=True)
     if mode == "data":
-        data_dir = storage_dir / "data"
-        os.makedirs(data_dir, exist_ok=True)
+        task_data_dir = storage_dir / "data" / task_name
+        os.makedirs(task_data_dir, exist_ok=True)
         if task_name == SUMMARIZATION_TASK:
-            from crystal_summarization.data import generate_datasets
+            from crystal.summarization.data import generate_datasets
             start_date = date.today()
             if len(sys.argv) >= 5:
                 start_date = datetime.strptime(sys.argv[4], "%Y-%m-%d").date()
@@ -31,20 +32,29 @@ def main():
             if len(sys.argv) >= 6:
                 end_date = datetime.strptime(sys.argv[5], "%Y-%m-%d").date()
             generate_datasets(
-                data_dir,
+                task_data_dir,
                 train_dataset_dir, val_dataset_dir, test_dataset_dir,
                 (start_date, end_date),
+            )
+        elif task_name == CHATBOT_TASK:
+            from crystal.chatbot.data import generate_datasets
+            generate_datasets(
+                task_data_dir,
+                train_dataset_dir, val_dataset_dir,
             )
     elif mode == "train":
         task_train_dir = storage_dir / "train" / task_name
         run_train_dir = task_train_dir / datetime.now().strftime("%Y%m%d-%H%M%S")
         os.makedirs(run_train_dir, exist_ok=True)
         if task_name == SUMMARIZATION_TASK:
-            from crystal_summarization.train import train
+            from crystal.summarization.train import train
+            train(train_dataset_dir, val_dataset_dir, run_train_dir)
+        elif task_name == CHATBOT_TASK:
+            from crystal.chatbot.train import train
             train(train_dataset_dir, val_dataset_dir, run_train_dir)
     elif mode == "eval":
         if task_name == SUMMARIZATION_TASK:
-            from crystal_summarization.eval import eval
+            from crystal.summarization.eval import eval
             eval(sys.argv[4])
 
 

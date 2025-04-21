@@ -7,7 +7,11 @@ CRySTAL: Condensed Reinforcement using Structured Training for Adaptive Learning
 - Adaptive Learning: Adjusting the model to focus on a specific use case instead of general use
 
 ## 2. Data
-- [Extraction](./crystal-ai/crystal_extraction/) and [summarization](./crystal-ai/crystal_summarization/) tasks: Use the data collected from https://github.com/metalwhale/chloria
+### 2.a. [Extraction](./crystal-ai/crystal/extraction/) and [summarization](./crystal-ai/crystal/summarization/) tasks
+Use the news data collected from https://github.com/metalwhale/chloria
+
+### 2.b. [Chatbot](./crystal-ai/crystal/chatbot/) task
+[Download Slack workspace data as a `.zip` file](https://slack.com/help/articles/201658943-Export-your-workspace-data) and extract its contents into `./storage/data/chatbot/origin/slack/` directory (Ref: [`data.py`](./crystal-ai/crystal/chatbot/data.py) file)
 
 ## 3. Deployment
 ### 3.1. Set up the environment
@@ -110,15 +114,24 @@ cd ../storage/
 
 #### 3.2.2. Generate data
 ```bash
-nohup uv run ../crystal-ai/main.py data summarization ./ 2025-04-07 &
+# Summarization task
+uv run ../crystal-ai/main.py data summarization ./ 2025-04-07
+
+# Chatbot task
+uv run ../crystal-ai/main.py data chatbot ./
 ```
 
 #### 3.2.3. Train models
 ```bash
+# Summarization task
 nohup uv run ../crystal-ai/main.py train summarization ./ &
+
+# Chatbot task
+nohup uv run ../crystal-ai/main.py train chatbot ./ &
 ```
 
 #### 3.2.4. Evaluate models
 ```bash
+# Summarization task
 nohup uv run ../crystal-ai/main.py eval summarization ./ ./train/summarization/${TASK_SUBDIR}/lora &
 ```
