@@ -11,11 +11,11 @@ import pylcs
 from datasets import load_dataset
 # Unsloth should be imported before trl, transformers, peft to ensure all optimizations are applied
 import unsloth
-from trl import GRPOConfig, GRPOTrainer
+from trl import GRPOConfig, GRPOTrainer, apply_chat_template
 from trl.trainer.grpo_trainer import RewardFunc
 
 from .._common.train import LogCallback, find_redundancy_length
-from .model import build
+from .model import build, extract_user_content
 
 
 class RewardFunctionBuilder:
@@ -48,6 +48,7 @@ class RewardFunctionBuilder:
         UPPER_BOUND_RATIO = 0.3
         rewards: list[float] = []
         for prompt, completion in zip(prompts, completions):
+            prompt = extract_user_content(prompt)
             if len(completion) == 0:
                 rewards.append(-1)
                 continue
@@ -72,6 +73,7 @@ class RewardFunctionBuilder:
         UPPER_BOUND_RATIO = 1.5
         rewards: list[float] = []
         for prompt, completion in zip(prompts, completions):
+            prompt = extract_user_content(prompt)
             if len(completion) == 0:
                 rewards.append(-1)
                 continue
@@ -123,6 +125,7 @@ class RewardFunctionBuilder:
         AMPLIFICATION_FACTOR = 0.25
         rewards: list[float] = []
         for prompt, completion in zip(prompts, completions):
+            prompt = extract_user_content(prompt)
             if len(completion) == 0:
                 rewards.append(-1)
                 continue
@@ -187,15 +190,19 @@ class RewardFunctionBuilder:
         **kwargs,
     ) -> list[float]:
         log_file_path = self._completion_log_dir / (datetime.now().strftime("%Y%m%d-%H") + ".csv")
-        log_row = {"prompt_completion": prompts[0] + completions[0], "truth_response": truth_response[0]}
+        log_row = {
+            "prompt": extract_user_content(prompts[0]),
+            "completion": completions[0],
+            "truth_response": truth_response[0],
+        }
         creating_log_file = not os.path.isfile(log_file_path)
         with open(log_file_path, "a") as log_file:
-            log_writer = csv.DictWriter(log_file, ["prompt_completion", "truth_response"])
+            log_writer = csv.DictWriter(log_file, ["prompt", "completion", "truth_response"])
             if creating_log_file:
                 log_writer.writeheader()
             log_writer.writerow(log_row)
         # Dummy rewards
-        return [0 for c in completions]
+        return [0 for _ in completions]
 
 
 def train(
@@ -203,11 +210,6 @@ def train(
     val_dataset_dir: os.PathLike,
     run_train_dir: os.PathLike,
 ):
-    # TODO: Fix the bug where, starting from a specific step (usually when the learning rate is at its highest),
-    # the model begins outputting meaningless completions by repeatedly generating only a few characters.
-    # Currently, I'm addressing this issue by designing the reward functions so that the rewards they return
-    # fall within ranges that aren't too far apart, using "AMPLIFICATION_FACTOR" variables to control the weights.
-    # I'm not sure if this is related to the bug, but it seems to help.
     model, tokenizer = build()
     config = GRPOConfig(
         output_dir=run_train_dir / "output",
@@ -221,6 +223,14 @@ def train(
         "train": f"{str(train_dataset_dir)}/*.csv",
         "val": f"{str(val_dataset_dir)}/*.csv",
     })
+
+    def convert_to_conversational(example: dict[str, str]) -> dict:
+        return {"prompt": [
+            {"role": "system", "content": "Trả lời bằng tiếng Việt theo phong cách dễ thương."},
+            {"role": "user", "content": example["prompt"]},
+        ]}
+    dataset = dataset.map(convert_to_conversational)
+    dataset = dataset.map(apply_chat_template, fn_kwargs={"tokenizer": tokenizer})  # Convert back to standard format
     completion_log_dir = run_train_dir / "completion_log"
     os.makedirs(completion_log_dir, exist_ok=True)
     trainer = GRPOTrainer(
