@@ -6,7 +6,6 @@ import os
 import random
 import re
 from collections import defaultdict
-from pathlib import Path
 
 _logger = logging.getLogger(__name__)
 
@@ -92,19 +91,16 @@ def generate_datasets(
     val_text_sequences = all_text_sequences[train_len:train_len + val_len]
     train_file_path = train_dataset_dir / "train.csv"
     val_file_path = val_dataset_dir / "val.csv"
-    with open(Path(__file__).parent / "prompts" / "standard.md") as standard_prompt_file:
-        standard_prompt = standard_prompt_file.read()
-        for file_name, text_sequences in zip(
-            [train_file_path, val_file_path],
-            [train_text_sequences, val_text_sequences],
-        ):
-            with open(file_name, "w", encoding="utf8") as dataset_file:
-                dataset_writer = csv.DictWriter(dataset_file, ["prompt", "truth_response"])
-                dataset_writer.writeheader()
-                for text_sequence in text_sequences:
-                    text1, text2, *_ = text_sequence
-                    prompt = standard_prompt.replace("${TEXT}", text1)
-                    dataset_writer.writerow({"prompt": prompt, "truth_response": text2})
+    for file_name, text_sequences in zip(
+        [train_file_path, val_file_path],
+        [train_text_sequences, val_text_sequences],
+    ):
+        with open(file_name, "w", encoding="utf8") as dataset_file:
+            dataset_writer = csv.DictWriter(dataset_file, ["prompt", "truth_response"])
+            dataset_writer.writeheader()
+            for text_sequence in text_sequences:
+                text1, text2, *_ = text_sequence
+                dataset_writer.writerow({"prompt": text1, "truth_response": text2})
     _logger.info(f"Generated datasets: train_len={len(train_text_sequences)}, val_len={len(val_text_sequences)}")
     return len(all_text_sequences)
 
