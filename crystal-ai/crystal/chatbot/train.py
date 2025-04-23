@@ -7,7 +7,6 @@ import os
 from collections import Counter
 from datetime import datetime
 
-import pylcs
 from datasets import load_dataset
 # Unsloth should be imported before trl, transformers, peft to ensure all optimizations are applied
 import unsloth
@@ -30,35 +29,37 @@ class RewardFunctionBuilder:
         def _log(prompts: list[str], completions: list[str], truth_response: list[str]) -> list[float]:
             return self._log(prompts, completions, truth_response)
         return [
-            self._penalize_prompt_overlap,
+            self._score_words,
             self._penalize_improper_length,
-            self._penalize_character_duplication,
+            self._penalize_word_duplication,
             self._penalize_redundancy,
-            self._reward_response_intersection,
+            self._penalize_prompt_intersection,
             _log,
         ]
 
     @staticmethod
-    def _penalize_prompt_overlap(
+    def _score_words(
         prompts: list[str],
         completions: list[str],
         truth_response: list[str],
         **kwargs,
     ) -> list[float]:
-        UPPER_BOUND_RATIO = 0.3
         rewards: list[float] = []
-        for prompt, completion in zip(prompts, completions):
-            prompt = extract_user_content(prompt)
+        for completion in completions:
             if len(completion) == 0:
                 rewards.append(-1)
                 continue
-            upper_bound = UPPER_BOUND_RATIO * len(completion)
-            # "Overlap" is the longest common substring length of the prompt and the completion
-            overlap_length = pylcs.lcs_string_length(prompt, completion)
             reward = 0
-            if overlap_length >= upper_bound:
-                # Penalize long overlap: reward is 0 at the upper bound and becomes more negative as the overlap grows
-                reward = 1 - overlap_length / upper_bound
+            completion_words = completion.lower().split(" ")
+            # Penalize blacklisted words
+            for word in ["tôi", "xin lỗi", "bạn", "đúng", "cảm ơn", "chúc", "đừng"]:
+                reward += -0.1 * completion_words.count(word)
+            for word in [".", ",", "!"]:
+                reward += -0.05 * completion_words.count(word)
+            # Reward whitelisted words
+            for word in ["em"]:
+                if word in completion_words:
+                    reward += 0.1
             rewards.append(reward)
         return rewards
 
@@ -70,7 +71,7 @@ class RewardFunctionBuilder:
         **kwargs,
     ) -> list[float]:
         LOWER_BOUND_RATIO = 0.5
-        UPPER_BOUND_RATIO = 1.5
+        UPPER_BOUND_RATIO = 1.0
         rewards: list[float] = []
         for prompt, completion in zip(prompts, completions):
             prompt = extract_user_content(prompt)
@@ -91,22 +92,23 @@ class RewardFunctionBuilder:
         return rewards
 
     @staticmethod
-    def _penalize_character_duplication(
+    def _penalize_word_duplication(
         prompts: list[str],
         completions: list[str],
         truth_response: list[str],
         **kwargs,
     ) -> list[float]:
-        AMPLIFICATION_FACTOR = 5
-        UPPER_BOUND_RATIO = 0.7
+        AMPLIFICATION_FACTOR = 1
+        UPPER_BOUND_RATIO = 0.1
         rewards: list[float] = []
         for completion in completions:
             if len(completion) == 0:
                 rewards.append(-1)
                 continue
-            upper_bound = UPPER_BOUND_RATIO * len(completion)
-            # "Duplication" is the number of extra times characters appear in the completion
-            duplication_count = len(completion) - len(set(completion))
+            completion_words = completion.split(" ")
+            upper_bound = UPPER_BOUND_RATIO * len(completion_words)
+            # "Duplication" is the number of extra times words appear in the completion
+            duplication_count = len(completion_words) - len(set(completion_words))
             reward = 0
             if duplication_count >= upper_bound:
                 # Penalize excessive duplication: reward is 0 at the upper bound and becomes more negative as duplication grows
@@ -140,22 +142,58 @@ class RewardFunctionBuilder:
         return rewards
 
     @staticmethod
-    def _reward_response_overlap(
+    def _penalize_prompt_intersection(
         prompts: list[str],
         completions: list[str],
         truth_response: list[str],
         **kwargs,
     ) -> list[float]:
-        AMPLIFICATION_FACTOR = 100
+        AMPLIFICATION_FACTOR = 2
+        UPPER_BOUND_RATIO = 0.1
+        rewards: list[float] = []
+        for prompt, completion in zip(prompts, completions):
+            prompt = extract_user_content(prompt)
+            if len(completion) == 0:
+                rewards.append(-1)
+                continue
+            prompt_word_counter = Counter(prompt.split(" "))
+            completion_word_counter = Counter(completion.split(" "))
+            upper_bound = UPPER_BOUND_RATIO * sum(prompt_word_counter.values())
+            # "Intersection" is the total number of shared words in the prompt and completion, including duplicates
+            shared_word_counter = prompt_word_counter & completion_word_counter  # `&` returns the minimum of corresponding counts
+            intersection_length = sum(shared_word_counter.values())
+            reward = 0
+            if intersection_length >= upper_bound:
+                # Penalize excessive intersection: reward is 0 at the upper bound and becomes more negative as intersection grows
+                reward = 1 - intersection_length / upper_bound
+            reward *= AMPLIFICATION_FACTOR
+            rewards.append(reward)
+        return rewards
+
+    @staticmethod
+    def _penalize_response_divergence(
+        prompts: list[str],
+        completions: list[str],
+        truth_response: list[str],
+        **kwargs,
+    ) -> list[float]:
+        AMPLIFICATION_FACTOR = 2
+        LOWER_BOUND_RATIO = 0.5
         rewards: list[float] = []
         for completion, response in zip(completions, truth_response):
             if len(completion) == 0:
                 rewards.append(-1)
                 continue
-            # "Overlap" is the longest common substring length of the completion and the response
-            overlap_length = pylcs.lcs_string_length(completion, response)
-            # The longer the overlap, the greater the reward
-            reward = min(overlap_length / len(completion), 1) * min(overlap_length / len(response), 1)
+            completion_word_counter = Counter(completion.split(" "))
+            response_word_counter = Counter(response.split(" "))
+            lower_bound = LOWER_BOUND_RATIO * sum(response_word_counter.values())
+            # "Intersection" is the total number of shared words in the completion and response, including duplicates
+            shared_word_counter = completion_word_counter & response_word_counter  # `&` returns the minimum of corresponding counts
+            intersection_length = sum(shared_word_counter.values())
+            reward = 0
+            if intersection_length <= lower_bound:
+                # Penalize excessive divergence: reward is 0 at the lower bound and becomes more negative as intersection shrinks
+                reward = intersection_length / lower_bound - 1
             reward *= AMPLIFICATION_FACTOR
             rewards.append(reward)
         return rewards
@@ -167,17 +205,19 @@ class RewardFunctionBuilder:
         truth_response: list[str],
         **kwargs,
     ) -> list[float]:
-        AMPLIFICATION_FACTOR = 4
+        AMPLIFICATION_FACTOR = 10
         rewards: list[float] = []
         for completion, response in zip(completions, truth_response):
             if len(completion) == 0:
                 rewards.append(-1)
                 continue
-            # "Intersection" is the total number of shared characters in the completion and response, including duplicates
-            shared_chars = Counter(completion) & Counter(response)  # `&` returns the minimum of corresponding counts
-            intersection_length = sum(shared_chars.values())
+            completion_word_counter = Counter(completion.split(" "))
+            response_word_counter = Counter(response.split(" "))
+            # "Intersection" is the total number of shared words in the completion and response, including duplicates
+            shared_word_counter = completion_word_counter & response_word_counter  # `&` returns the minimum of corresponding counts
+            intersection_length = sum(shared_word_counter.values())
             # The longer the intersection, the greater the reward
-            reward = min(intersection_length / len(completion), 1) * min(intersection_length / len(response), 1)
+            reward = min(intersection_length / sum(response_word_counter.values()), 1)
             reward *= AMPLIFICATION_FACTOR
             rewards.append(reward)
         return rewards
@@ -216,7 +256,7 @@ def train(
         num_train_epochs=1.0,
         max_prompt_length=1024,
         max_completion_length=512,
-        temperature=0.8,
+        temperature=0.9,
         logging_steps=10,
     )
     dataset = load_dataset("csv", data_files={
@@ -226,7 +266,7 @@ def train(
 
     def convert_to_conversational(example: dict[str, str]) -> dict:
         return {"prompt": [
-            {"role": "system", "content": "Trả lời bằng tiếng Việt theo phong cách dễ thương."},
+            {"role": "system", "content": "You're a gentle friend who replies cheerfully in Vietnamese with lots of emojis."},
             {"role": "user", "content": example["prompt"]},
         ]}
     dataset = dataset.map(convert_to_conversational)
