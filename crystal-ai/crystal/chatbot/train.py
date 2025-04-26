@@ -4,6 +4,7 @@
 
 import csv
 import os
+import re
 from collections import Counter
 from datetime import datetime
 
@@ -38,7 +39,7 @@ class RewardFunctionBuilder:
             self._score_words,
             self._penalize_improper_length,
             self._penalize_word_duplication,
-            self._penalize_redundancy,
+            self._penalize_short_phrase,
             self._penalize_prompt_intersection,
             _log,
         ]
@@ -59,14 +60,17 @@ class RewardFunctionBuilder:
             reward = 0
             completion_words = completion.lower().split(" ")
             # Penalize blacklisted words
-            for word in ["tôi", "xin lỗi", "bạn", "đúng", "cảm ơn", "chúc", "đừng"]:
+            for word in [
+                "tôi", "xin lỗi", "bạn", "đúng", "cảm ơn", "chúc", "đừng", "hiểu", "biết", "giúp", "đó",
+                "thấy", "thật",
+                "ờ", "à", "ồ", "ặc",
+                "!",
+            ]:
                 reward += -0.1 * completion_words.count(word)
-            for word in [".", ",", "!"]:
-                reward += -0.05 * completion_words.count(word)
             # Reward whitelisted words
             for word in ["em"]:
-                if word in completion_words:
-                    reward += 0.1
+                if word in completion_words and word != completion_words[0]:
+                    reward += 0.02
             rewards.append(reward)
         return rewards
 
@@ -78,23 +82,21 @@ class RewardFunctionBuilder:
         truth_response: list[str],
         **kwargs,
     ) -> list[float]:
-        LOWER_BOUND_RATIO = 0.5
-        UPPER_BOUND_RATIO = 1.0
+        LOWER_BOUND = 10
+        UPPER_BOUND = 30
         rewards: list[float] = []
-        for prompt, completion in zip(raw_prompt, completions):
+        for completion in completions:
             if len(completion) == 0:
                 rewards.append(-1)
                 continue
-            lower_bound = LOWER_BOUND_RATIO * len(prompt)
-            upper_bound = UPPER_BOUND_RATIO * len(prompt)
-            completion_length = len(completion)
+            completion_words_length = len(completion.split(" "))
             reward = 0
-            if completion_length <= lower_bound:
+            if completion_words_length <= LOWER_BOUND:
                 # Penalize short completion: reward is 0 at the lower bound and -1 when the length is zero
-                reward = completion_length / lower_bound - 1
-            elif completion_length >= upper_bound:
+                reward = completion_words_length / LOWER_BOUND - 1
+            elif completion_words_length >= UPPER_BOUND:
                 # Penalize long completion: reward is 0 at the upper bound and becomes more negative as the length grows
-                reward = 1 - completion_length / upper_bound
+                reward = 1 - completion_words_length / UPPER_BOUND
             rewards.append(reward)
         return rewards
 
@@ -150,6 +152,33 @@ class RewardFunctionBuilder:
         return rewards
 
     @staticmethod
+    def _penalize_short_phrase(
+        prompts: list[str],
+        raw_prompt: list[str],
+        completions: list[str],
+        truth_response: list[str],
+        **kwargs,
+    ) -> list[float]:
+        AMPLIFICATION_FACTOR = 1
+        MIN_PHRASE_LEN = 5
+        UPPER_BOUND_RATIO = 0.5
+        rewards: list[float] = []
+        for completion in completions:
+            if len(completion) == 0:
+                rewards.append(-1)
+                continue
+            phrase_lens = [len(p.strip().split(" ")) for p in re.split(r'[.!?,]', completion)]
+            short_phrases_len = sum([l for l in phrase_lens if l < MIN_PHRASE_LEN])
+            upper_bound = UPPER_BOUND_RATIO * len(completion.split(" "))
+            reward = 0
+            if short_phrases_len >= upper_bound:
+                # Penalize short phrases: reward is 0 at the upper bound and becomes more negative as more short phrases appear
+                reward = 1 - short_phrases_len / upper_bound
+            reward *= AMPLIFICATION_FACTOR
+            rewards.append(reward)
+        return rewards
+
+    @staticmethod
     def _penalize_prompt_intersection(
         prompts: list[str],
         raw_prompt: list[str],
@@ -157,8 +186,8 @@ class RewardFunctionBuilder:
         truth_response: list[str],
         **kwargs,
     ) -> list[float]:
-        AMPLIFICATION_FACTOR = 2
-        UPPER_BOUND_RATIO = 0.1
+        AMPLIFICATION_FACTOR = 1
+        UPPER_BOUND_RATIO = 0.2
         rewards: list[float] = []
         for prompt, completion in zip(raw_prompt, completions):
             if len(completion) == 0:
@@ -295,7 +324,7 @@ def train(
 
 def _convert_to_conversational(example: dict[str, str]) -> dict:
     prompt: list[dict[str, str]] = [
-        {"role": "system", "content": "You're a gentle friend who replies cheerfully in Vietnamese with lots of emojis."},
+        {"role": "system", "content": "You are a sweet and gentle girl with a hint of naughtiness; you always reply concisely in Vietnamese, in a seductive manner."},
     ]
     for i, content in enumerate(example["raw_prompt"].split(TEXT_SPLITTER)):
         if i % 2 == 0:

@@ -33,11 +33,9 @@ def generate_datasets(
     task_data_dir: os.PathLike,
     train_dataset_dir: os.PathLike,
     val_dataset_dir: os.PathLike,
-    train_len: int = 4000,
+    train_len: int = 6000,
     val_len: int = 400,
     conversation_time_gap: int = 60 * 60,  # In seconds
-    conversation_min_len: int = 2,
-    conversation_max_len: int = 10,
     text_min_len: int = 128,
     text_max_len: int = 512,
 ) -> int:
@@ -82,7 +80,7 @@ def generate_datasets(
     all_text_sequences = [
         [m.text for m in c.messages]
         for c in conversations
-        if conversation_min_len <= len(c.messages) <= conversation_max_len and len(c.messages) % 2 == 0
+        if len(c.messages) >= 2
     ]
     all_text_sequences = [
         s for s in all_text_sequences
@@ -102,6 +100,10 @@ def generate_datasets(
             dataset_writer = csv.DictWriter(dataset_file, ["raw_prompt", "truth_response"])
             dataset_writer.writeheader()
             for text_sequence in text_sequences:
+                if len(text_sequence) % 2 != 0:
+                    # The number of texts in a sequence should be even
+                    # so that the last text can be assigned to the assistant's `truth_response`.
+                    text_sequence.pop()
                 dataset_writer.writerow({
                     "raw_prompt": TEXT_SPLITTER.join(text_sequence[:-1]),
                     "truth_response": text_sequence[-1],
