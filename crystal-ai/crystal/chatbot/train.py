@@ -14,7 +14,8 @@ from trl import GRPOConfig, GRPOTrainer, apply_chat_template
 from trl.trainer.grpo_trainer import RewardFunc
 
 from .._common.train import LogCallback, find_redundancy_length
-from .model import build, extract_user_content
+from .data import TEXT_SPLITTER
+from .model import build
 
 
 class RewardFunctionBuilder:
@@ -26,8 +27,13 @@ class RewardFunctionBuilder:
         self._completion_log_dir = completion_log_dir
 
     def build(self) -> list[RewardFunc]:
-        def _log(prompts: list[str], completions: list[str], truth_response: list[str]) -> list[float]:
-            return self._log(prompts, completions, truth_response)
+        def _log(
+            prompts: list[str],
+            raw_prompt: list[str],
+            completions: list[str],
+            truth_response: list[str],
+        ) -> list[float]:
+            return self._log(prompts, raw_prompt, completions, truth_response)
         return [
             self._score_words,
             self._penalize_improper_length,
@@ -40,6 +46,7 @@ class RewardFunctionBuilder:
     @staticmethod
     def _score_words(
         prompts: list[str],
+        raw_prompt: list[str],
         completions: list[str],
         truth_response: list[str],
         **kwargs,
@@ -66,6 +73,7 @@ class RewardFunctionBuilder:
     @staticmethod
     def _penalize_improper_length(
         prompts: list[str],
+        raw_prompt: list[str],
         completions: list[str],
         truth_response: list[str],
         **kwargs,
@@ -73,8 +81,7 @@ class RewardFunctionBuilder:
         LOWER_BOUND_RATIO = 0.5
         UPPER_BOUND_RATIO = 1.0
         rewards: list[float] = []
-        for prompt, completion in zip(prompts, completions):
-            prompt = extract_user_content(prompt)
+        for prompt, completion in zip(raw_prompt, completions):
             if len(completion) == 0:
                 rewards.append(-1)
                 continue
@@ -94,6 +101,7 @@ class RewardFunctionBuilder:
     @staticmethod
     def _penalize_word_duplication(
         prompts: list[str],
+        raw_prompt: list[str],
         completions: list[str],
         truth_response: list[str],
         **kwargs,
@@ -120,14 +128,14 @@ class RewardFunctionBuilder:
     @staticmethod
     def _penalize_redundancy(
         prompts: list[str],
+        raw_prompt: list[str],
         completions: list[str],
         truth_response: list[str],
         **kwargs,
     ) -> list[float]:
         AMPLIFICATION_FACTOR = 0.25
         rewards: list[float] = []
-        for prompt, completion in zip(prompts, completions):
-            prompt = extract_user_content(prompt)
+        for prompt, completion in zip(raw_prompt, completions):
             if len(completion) == 0:
                 rewards.append(-1)
                 continue
@@ -144,6 +152,7 @@ class RewardFunctionBuilder:
     @staticmethod
     def _penalize_prompt_intersection(
         prompts: list[str],
+        raw_prompt: list[str],
         completions: list[str],
         truth_response: list[str],
         **kwargs,
@@ -151,8 +160,7 @@ class RewardFunctionBuilder:
         AMPLIFICATION_FACTOR = 2
         UPPER_BOUND_RATIO = 0.1
         rewards: list[float] = []
-        for prompt, completion in zip(prompts, completions):
-            prompt = extract_user_content(prompt)
+        for prompt, completion in zip(raw_prompt, completions):
             if len(completion) == 0:
                 rewards.append(-1)
                 continue
@@ -173,6 +181,7 @@ class RewardFunctionBuilder:
     @staticmethod
     def _penalize_response_divergence(
         prompts: list[str],
+        raw_prompt: list[str],
         completions: list[str],
         truth_response: list[str],
         **kwargs,
@@ -201,6 +210,7 @@ class RewardFunctionBuilder:
     @staticmethod
     def _reward_response_intersection(
         prompts: list[str],
+        raw_prompt: list[str],
         completions: list[str],
         truth_response: list[str],
         **kwargs,
@@ -225,19 +235,20 @@ class RewardFunctionBuilder:
     def _log(
         self,
         prompts: list[str],
+        raw_prompt: list[str],
         completions: list[str],
         truth_response: list[str],
         **kwargs,
     ) -> list[float]:
         log_file_path = self._completion_log_dir / (datetime.now().strftime("%Y%m%d-%H") + ".csv")
         log_row = {
-            "prompt": extract_user_content(prompts[0]),
+            "raw_prompt": raw_prompt[0],
             "completion": completions[0],
             "truth_response": truth_response[0],
         }
         creating_log_file = not os.path.isfile(log_file_path)
         with open(log_file_path, "a") as log_file:
-            log_writer = csv.DictWriter(log_file, ["prompt", "completion", "truth_response"])
+            log_writer = csv.DictWriter(log_file, ["raw_prompt", "completion", "truth_response"])
             if creating_log_file:
                 log_writer.writeheader()
             log_writer.writerow(log_row)
@@ -263,13 +274,7 @@ def train(
         "train": f"{str(train_dataset_dir)}/*.csv",
         "val": f"{str(val_dataset_dir)}/*.csv",
     })
-
-    def convert_to_conversational(example: dict[str, str]) -> dict:
-        return {"prompt": [
-            {"role": "system", "content": "You're a gentle friend who replies cheerfully in Vietnamese with lots of emojis."},
-            {"role": "user", "content": example["prompt"]},
-        ]}
-    dataset = dataset.map(convert_to_conversational)
+    dataset = dataset.map(_convert_to_conversational)
     dataset = dataset.map(apply_chat_template, fn_kwargs={"tokenizer": tokenizer})  # Convert back to standard format
     completion_log_dir = run_train_dir / "completion_log"
     os.makedirs(completion_log_dir, exist_ok=True)
@@ -286,3 +291,15 @@ def train(
     )
     trainer.train()
     model.save_lora(run_train_dir / "lora")
+
+
+def _convert_to_conversational(example: dict[str, str]) -> dict:
+    prompt: list[dict[str, str]] = [
+        {"role": "system", "content": "You're a gentle friend who replies cheerfully in Vietnamese with lots of emojis."},
+    ]
+    for i, content in enumerate(example["raw_prompt"].split(TEXT_SPLITTER)):
+        if i % 2 == 0:
+            prompt.append({"role": "user", "content": content})
+        else:
+            prompt.append({"role": "assistant", "content": content})
+    return {"prompt": prompt}

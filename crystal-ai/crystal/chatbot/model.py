@@ -18,17 +18,3 @@ def build(lora_rank: int = 64):
         use_gradient_checkpointing="unsloth",
     )
     return model, tokenizer
-
-
-def extract_user_content(prompt: str) -> str:
-    # Prompt follows the format of chat template
-    # Ref: https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct/blob/5fee7c4/tokenizer_config.json
-    # ```
-    # <|im_start|>system
-    # ${SYSTEM_CONTENT}<|im_end|>
-    # <|im_start|>user
-    # ${USER_CONTENT}<|im_end|>
-    # <|im_start|>assistant
-    # ${ASSISTANT_CONTENT}
-    # ```
-    return prompt.split("<|im_start|>user\n")[1].split("<|im_end|>")[0]
