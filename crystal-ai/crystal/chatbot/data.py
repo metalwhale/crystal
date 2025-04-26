@@ -7,6 +7,7 @@ import random
 import re
 from collections import defaultdict
 
+TEXT_SPLITTER = "\n"
 _logger = logging.getLogger(__name__)
 
 
@@ -32,10 +33,11 @@ def generate_datasets(
     task_data_dir: os.PathLike,
     train_dataset_dir: os.PathLike,
     val_dataset_dir: os.PathLike,
-    train_len: int = 8000,
+    train_len: int = 4000,
     val_len: int = 400,
     conversation_time_gap: int = 60 * 60,  # In seconds
-    conversation_messages_len: int = 2,
+    conversation_min_len: int = 2,
+    conversation_max_len: int = 10,
     text_min_len: int = 128,
     text_max_len: int = 512,
 ) -> int:
@@ -78,8 +80,9 @@ def generate_datasets(
             conversations.append(conversation)
     # Convert to strings
     all_text_sequences = [
-        [m.text for m in c.messages[:conversation_messages_len]]
-        for c in conversations if len(c.messages) >= conversation_messages_len
+        [m.text for m in c.messages]
+        for c in conversations
+        if conversation_min_len <= len(c.messages) <= conversation_max_len and len(c.messages) % 2 == 0
     ]
     all_text_sequences = [
         s for s in all_text_sequences
@@ -91,16 +94,18 @@ def generate_datasets(
     val_text_sequences = all_text_sequences[train_len:train_len + val_len]
     train_file_path = train_dataset_dir / "train.csv"
     val_file_path = val_dataset_dir / "val.csv"
-    for file_name, text_sequences in zip(
+    for file_path, text_sequences in zip(
         [train_file_path, val_file_path],
         [train_text_sequences, val_text_sequences],
     ):
-        with open(file_name, "w", encoding="utf8") as dataset_file:
-            dataset_writer = csv.DictWriter(dataset_file, ["prompt", "truth_response"])
+        with open(file_path, "w", encoding="utf8") as dataset_file:
+            dataset_writer = csv.DictWriter(dataset_file, ["raw_prompt", "truth_response"])
             dataset_writer.writeheader()
             for text_sequence in text_sequences:
-                text1, text2, *_ = text_sequence
-                dataset_writer.writerow({"prompt": text1, "truth_response": text2})
+                dataset_writer.writerow({
+                    "raw_prompt": TEXT_SPLITTER.join(text_sequence[:-1]),
+                    "truth_response": text_sequence[-1],
+                })
     _logger.info(f"Generated datasets: train_len={len(train_text_sequences)}, val_len={len(val_text_sequences)}")
     return len(all_text_sequences)
 
