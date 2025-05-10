@@ -85,7 +85,7 @@ curl https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/8c2fd26/Q
 
 Start the llama.cpp [server](https://github.com/ggml-org/llama.cpp/blob/b4927/examples/server/README.md):
 ```bash
-nohup llama-server -m ${PWD}/models/model.gguf -ngl 99 --temp 0 --port 8080 &
+nohup llama-server -m ${PWD}/models/model.gguf -ngl 99 --temp 0 --port 8080 &> nohup_llamacpp.out &
 
 # Send a chat completion request (optional)
 curl http://localhost:8080/v1/chat/completions -H "Content-Type: application/json" -H "Authorization: Bearer no-key" -d '{"messages": [{"role":"system","content":"You are Crystal, an AI assistant."},{"role":"user","content":"Hello world"}]}'
@@ -119,6 +119,9 @@ uv run ../crystal-ai/main.py data summarization ./ 2025-04-07
 
 # Chatbot task
 uv run ../crystal-ai/main.py data chatbot ./
+
+# Extraction task
+LLAMACPP_MAX_TOKENS=4096 nohup uv run ../crystal-ai/main.py data extraction ./ 2025-04-07 &
 ```
 
 #### 3.2.3. Train models

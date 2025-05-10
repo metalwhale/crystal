@@ -1,5 +1,4 @@
 import csv
-import json
 import logging
 import os
 import time
@@ -8,6 +7,8 @@ from pathlib import Path
 
 import openai
 import requests
+
+from .._common.data import chat, download_chloria_origin_data
 
 _ORIGIN_SUBDIR_NAME = "origin"
 _TRUTH_SUBDIR_NAME = "truth"
@@ -21,37 +22,10 @@ def generate_datasets(
     test_dataset_dir: os.PathLike,
     date_range: tuple[date, date],
 ):
-    _download_origin_data(task_data_dir, date_range)
+    origin_data_dir = task_data_dir / _ORIGIN_SUBDIR_NAME
+    os.makedirs(origin_data_dir, exist_ok=True)
+    download_chloria_origin_data(origin_data_dir, date_range)
     _generate_datasets(task_data_dir, train_dataset_dir, val_dataset_dir, test_dataset_dir, date_range)
-
-
-def _download_origin_data(task_data_dir: os.PathLike, date_range: tuple[date, date]):
-    os.makedirs(task_data_dir / _ORIGIN_SUBDIR_NAME, exist_ok=True)
-    CHLORIA_API_ROOT_ENDPOINT = "https://chloria.wave.metalwhale.dev/api"
-    start_date, end_date = date_range
-    for day_delta in range((end_date - start_date).days):
-        cur_date = start_date + timedelta(days=day_delta)
-        origin_file_path = task_data_dir / _ORIGIN_SUBDIR_NAME / f"{cur_date}.csv"
-        if os.path.isfile(origin_file_path):
-            continue
-        _logger.info(f"Downloading origin news: cur_date={cur_date}")
-        response = requests.post(
-            f"{CHLORIA_API_ROOT_ENDPOINT}/authenticate",
-            json={
-                "api_key": os.environ["CHLORIA_API_KEY"],
-                "api_secret": os.environ["CHLORIA_API_SECRET"],
-            },
-        )
-        token = json.loads(response.text)["token"]
-        response = requests.get(
-            f"{CHLORIA_API_ROOT_ENDPOINT}/news?date={cur_date.isoformat()}",
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {token}",
-            },
-        )
-        with open(origin_file_path, mode="wb") as origin_file:
-            origin_file.write(response.content)
 
 
 def _generate_datasets(
@@ -152,27 +126,6 @@ def _summarize(data_dir: os.PathLike, date_range: tuple[date, date]):
                 if text == "":
                     continue
                 _logger.info(f"Generating truth: cur_date={cur_date}, article_id={article_id}")
-                summary = _chat(llamacpp_client, conversational_prompt.replace("${CONTENT}", text))
+                summary = chat(llamacpp_client, conversational_prompt.replace("${CONTENT}", text))
                 truth_writer.writerow({"article_id": article_id, "summary": summary})
                 truth_file.flush()
-
-
-def _chat(client: openai.OpenAI, prompt: str) -> str:
-    choice_content = ""
-    if "$" in prompt:
-        _logger.warning("Some placeholders haven't been replaced with real values")
-    try:
-        completion = client.chat.completions.create(
-            model="",
-            messages=[
-                {"role": "system", "content": "You are Crystal, an AI assistant."},
-                {"role": "user", "content": prompt},
-            ],
-            # TODO: Choose appropriate values
-            max_tokens=os.environ.get("LLAMACPP_MAX_TOKENS", None),
-        )
-        choice_content = completion.choices[0].message.content
-    except Exception as error:
-        _logger.error(f"Unexpected error: error={error}")
-    finally:
-        return choice_content
