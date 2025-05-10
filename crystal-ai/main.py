@@ -7,6 +7,7 @@ from pathlib import Path
 
 SUMMARIZATION_TASK = "summarization"
 CHATBOT_TASK = "chatbot"
+EXTRACTION_TASK = "extraction"
 
 
 def main():
@@ -41,6 +42,19 @@ def main():
             generate_datasets(
                 task_data_dir,
                 train_dataset_dir, val_dataset_dir,
+            )
+        elif task_name == EXTRACTION_TASK:
+            from crystal.extraction.data import generate_datasets
+            start_date = date.today()
+            if len(sys.argv) >= 5:
+                start_date = datetime.strptime(sys.argv[4], "%Y-%m-%d").date()
+            end_date = start_date + timedelta(days=1)
+            if len(sys.argv) >= 6:
+                end_date = datetime.strptime(sys.argv[5], "%Y-%m-%d").date()
+            generate_datasets(
+                task_data_dir,
+                train_dataset_dir, val_dataset_dir, test_dataset_dir,
+                (start_date, end_date),
             )
     elif mode == "train":
         task_train_dir = storage_dir / "train" / task_name
