@@ -131,6 +131,9 @@ nohup uv run ../crystal-ai/main.py train summarization ./ &
 
 # Chatbot task
 nohup uv run ../crystal-ai/main.py train chatbot ./ &
+
+# Extraction task
+nohup uv run ../crystal-ai/main.py train extraction ./ &
 ```
 
 #### 3.2.4. Evaluate models
