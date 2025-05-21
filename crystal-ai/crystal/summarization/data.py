@@ -1,12 +1,10 @@
 import csv
 import logging
 import os
-import time
 from datetime import date, timedelta
 from pathlib import Path
 
 import openai
-import requests
 
 from .._common.data import chat, download_chloria_origin_data
 
@@ -83,26 +81,12 @@ def _generate_datasets(
 
 
 def _summarize(data_dir: os.PathLike, date_range: tuple[date, date]):
-    llamacpp_root_endpoint = os.environ["LLAMACPP_SERVER_ROOT_ENDPOINT"]
-    MAX_TRIES = 50
-    try_count = 0
-    while True:
-        try:
-            try_count += 1
-            # Doc: https://github.com/ggml-org/llama.cpp/blob/b4927/examples/server/README.md#api-endpoints
-            response = requests.get(f"{llamacpp_root_endpoint}/health")
-            if response.status_code == 200:
-                break
-        except:
-            pass
-        time.sleep(10)
-        if try_count == MAX_TRIES:
-            exit(0)
     os.makedirs(data_dir / _TRUTH_SUBDIR_NAME, exist_ok=True)
     start_date, end_date = date_range
     conversational_prompt = ""
     with open(Path(__file__).parent / "prompts" / "conversational.md") as conversational_prompt_file:
         conversational_prompt = conversational_prompt_file.read()
+    llamacpp_root_endpoint = os.environ["LLAMACPP_SERVER_ROOT_ENDPOINT"]
     llamacpp_client = openai.OpenAI(
         base_url=f"{llamacpp_root_endpoint}/v1",
         api_key="no-key",
