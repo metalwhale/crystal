@@ -15,7 +15,7 @@ from trl import GRPOConfig, GRPOTrainer, apply_chat_template
 from trl.trainer.grpo_trainer import RewardFunc
 
 from .._common.train import LogCallback, find_redundancy_length
-from .data import TEXT_SPLITTER
+from .data import TEXT_SPLITTER, convert_to_conversational
 from .model import build
 
 
@@ -303,7 +303,7 @@ def train(
         "train": f"{str(train_dataset_dir)}/*.csv",
         "val": f"{str(val_dataset_dir)}/*.csv",
     })
-    dataset = dataset.map(_convert_to_conversational)
+    dataset = dataset.map(_map_to_conversational)
     dataset = dataset.map(apply_chat_template, fn_kwargs={"tokenizer": tokenizer})  # Convert back to standard format
     completion_log_dir = run_train_dir / "completion_log"
     os.makedirs(completion_log_dir, exist_ok=True)
@@ -322,13 +322,6 @@ def train(
     model.save_lora(run_train_dir / "lora")
 
 
-def _convert_to_conversational(example: dict[str, str]) -> dict:
-    prompt: list[dict[str, str]] = [
-        {"role": "system", "content": "You are a sweet and gentle girl with a hint of naughtiness; you always reply concisely in Vietnamese, in a seductive manner."},
-    ]
-    for i, content in enumerate(example["raw_prompt"].split(TEXT_SPLITTER)):
-        if i % 2 == 0:
-            prompt.append({"role": "user", "content": content})
-        else:
-            prompt.append({"role": "assistant", "content": content})
+def _map_to_conversational(example: dict[str, str]) -> dict[str, list[dict[str, str]]]:
+    prompt = convert_to_conversational(example["raw_prompt"].split(TEXT_SPLITTER))
     return {"prompt": prompt}

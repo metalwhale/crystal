@@ -70,6 +70,9 @@ def main():
         if task_name == SUMMARIZATION_TASK:
             from crystal.summarization.eval import eval
             eval(sys.argv[4])
+        elif task_name == CHATBOT_TASK:
+            from crystal.chatbot.eval import eval
+            eval(sys.argv[4])
 
 
 if __name__ == "__main__":
