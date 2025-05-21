@@ -29,6 +29,18 @@ class Conversation:
         self.messages = []
 
 
+def convert_to_conversational(texts: list[str]) -> list[dict[str, str]]:
+    prompt: list[dict[str, str]] = [
+        {"role": "system", "content": "You are a sweet and gentle girl with a hint of naughtiness; you always reply concisely in Vietnamese, in a seductive manner."},
+    ]
+    for i, text in enumerate(texts):
+        if i % 2 == 0:
+            prompt.append({"role": "user", "content": text})
+        else:
+            prompt.append({"role": "assistant", "content": text})
+    return prompt
+
+
 def generate_datasets(
     task_data_dir: os.PathLike,
     train_dataset_dir: os.PathLike,
