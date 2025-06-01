@@ -143,4 +143,7 @@ nohup uv run ../crystal-ai/main.py eval summarization ./ ./train/summarization/$
 
 # Chatbot task
 uv run ../crystal-ai/main.py eval chatbot ./ ./train/chatbot/${TASK_SUBDIR}/lora
+
+# Extraction task
+uv run ../crystal-ai/main.py eval extraction ./ ./train/extraction/${TASK_SUBDIR}/lora
 ```

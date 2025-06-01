@@ -76,6 +76,9 @@ def main():
         elif task_name == CHATBOT_TASK:
             from crystal.chatbot.eval import eval
             eval(sys.argv[4])
+        elif task_name == EXTRACTION_TASK:
+            from crystal.extraction.eval import eval
+            eval(sys.argv[4], val_dataset_dir)
 
 
 if __name__ == "__main__":
