@@ -37,6 +37,7 @@ class RewardFunctionBuilder:
             return self._log(prompts, origin_text, completions, truth_fields_str)
         return [
             self._score_fields,
+            self._bonus_fields,
             _log,
         ]
 
@@ -73,22 +74,79 @@ class RewardFunctionBuilder:
                     score += key_score * -0.5
                     continue
                 keys.add(key)
-                if not isinstance(fields[key], str):
+                if not isinstance(fields[key], dict):
+                    score += key_score * 0.0
+                    continue
+                info = fields[key]
+                if not ("value" in info and "evidence" in info):
                     score += key_score * 0.2
                     continue
-                value = fields[key]
-                if value not in text:
+                value = str(info["value"])
+                if not (value in text):
                     score += key_score * 0.4
                     continue
-                if value not in truth_fields[key]["value"] and truth_fields[key]["value"] not in value:
+                truth_value = truth_fields[key]["value"]
+                if not (value in truth_value or truth_value in value):
                     score += key_score * 0.6
                     continue
-                if value != truth_fields[key]["value"]:
+                if not (value == truth_value):
                     score += key_score * 0.8
                     continue
                 score += key_score
             scores.append(score)
         return scores
+
+    @staticmethod
+    def _bonus_fields(
+        prompts: list[str],
+        origin_text: list[str],
+        completions: list[str],
+        truth_fields_str: list[str],
+        **kwargs,
+    ) -> list[float]:
+        bonuses: list[float] = []
+        for text, completion, response in zip(origin_text, completions, truth_fields_str):
+            truth_fields: dict[str, dict[str, str]] = json.loads(response.removeprefix("```json").removesuffix("```"))
+            keys = set()
+            if len(completion) == 0:
+                bonuses.append(0)
+                continue
+            try:
+                fields = json.loads(completion.removeprefix("```json").removesuffix("```"))
+            except ValueError:
+                bonuses.append(0)
+                continue
+            if not isinstance(fields, dict):
+                bonuses.append(0)
+                continue
+            bonus = 0
+            key_bonus = 1 / len(truth_fields) * 0.2  # Bonus should be smaller than score. Ref: `_score_fields` method.
+            for key in fields.keys():
+                if key not in truth_fields:
+                    continue
+                if key in keys:
+                    continue
+                keys.add(key)
+                if not isinstance(fields[key], dict):
+                    continue
+                info = fields[key]
+                if not ("value" in info and "evidence" in info):
+                    continue
+                value = str(info["value"])
+                evidence = str(info["evidence"])
+                truth_value = truth_fields[key]["value"]
+                if not (value in truth_value or truth_value in value):
+                    continue
+                if 40 < len(evidence) < 100:
+                    bonus += key_bonus * 0.1
+                if value in evidence and value != evidence:
+                    bonus += key_bonus * 0.4
+                if truth_value in evidence and truth_value != evidence:
+                    bonus += key_bonus * 0.4
+                if evidence in text:
+                    bonus += key_bonus * 0.1
+            bonuses.append(bonus)
+        return bonuses
 
     def _log(
         self,
@@ -124,7 +182,7 @@ def train(
         output_dir=run_train_dir / "output",
         num_train_epochs=1.0,
         max_prompt_length=1024,
-        max_completion_length=512,
+        max_completion_length=2048,
         temperature=0.2,
         logging_steps=10,
     )
