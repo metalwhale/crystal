@@ -41,7 +41,7 @@ def eval(lora_dir: os.PathLike, val_dataset_dir: os.PathLike):
         prompt = apply_chat_template(example, tokenizer)["prompt"]
         sampling_params = SamplingParams(
             temperature=0.2,
-            max_tokens=1024,  # Intentionally set longer than `max_completion_length` during training
+            max_tokens=2048,
         )
         print("======================================================")
         print("------------------ Origin text ------------------")
