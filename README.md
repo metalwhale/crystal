@@ -7,7 +7,7 @@ CRySTAL: Condensed Reinforcement using Structured Training for Adaptive Learning
 - Adaptive Learning: Adjusting the model to focus on a specific use case instead of general use
 
 ## 2. Data
-### 2.a. [Extraction](./crystal-ai/crystal/extraction/) and [summarization](./crystal-ai/crystal/summarization/) tasks
+### 2.a. [Extraction](./crystal-ai/crystal/extraction/), [summarization](./crystal-ai/crystal/summarization/), [haiku](./crystal-ai/crystal/haiku/) tasks
 Use the news data collected from https://github.com/metalwhale/chloria
 
 ### 2.b. [Chatbot](./crystal-ai/crystal/chatbot/) task
@@ -115,13 +115,16 @@ cd ../storage/
 #### 3.2.2. Generate data
 ```bash
 # Summarization task
-uv run ../crystal-ai/main.py data summarization ./ 2025-04-07
+uv run ../crystal-ai/main.py data summarization ./ 2025-08-02
 
 # Chatbot task
 uv run ../crystal-ai/main.py data chatbot ./
 
 # Extraction task
-LLAMACPP_MAX_TOKENS=4096 nohup uv run ../crystal-ai/main.py data extraction ./ 2025-04-07 &
+LLAMACPP_MAX_TOKENS=4096 nohup uv run ../crystal-ai/main.py data extraction ./ 2025-08-02 &
+
+# Haiku task
+uv run ../crystal-ai/main.py data haiku ./ 2025-08-02
 ```
 
 #### 3.2.3. Train models
@@ -134,6 +137,10 @@ nohup uv run ../crystal-ai/main.py train chatbot ./ &
 
 # Extraction task
 nohup uv run ../crystal-ai/main.py train extraction ./ &
+
+# Haiku task
+uv run python -c 'import nltk; nltk.download("cmudict")'
+nohup uv run ../crystal-ai/main.py train haiku ./ &
 ```
 
 #### 3.2.4. Evaluate models
@@ -146,4 +153,7 @@ uv run ../crystal-ai/main.py eval chatbot ./ ./train/chatbot/${TASK_SUBDIR}/lora
 
 # Extraction task
 uv run ../crystal-ai/main.py eval extraction ./ ./train/extraction/${TASK_SUBDIR}/lora
+
+# Haiku task
+uv run ../crystal-ai/main.py eval haiku ./ ./train/haiku/${TASK_SUBDIR}/lora
 ```

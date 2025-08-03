@@ -8,6 +8,7 @@ from pathlib import Path
 SUMMARIZATION_TASK = "summarization"
 CHATBOT_TASK = "chatbot"
 EXTRACTION_TASK = "extraction"
+HAIKU_TASK = "haiku"
 
 
 def main():
@@ -56,6 +57,19 @@ def main():
                 train_dataset_dir, val_dataset_dir,
                 (start_date, end_date),
             )
+        elif task_name == HAIKU_TASK:
+            from crystal.haiku.data import generate_datasets
+            start_date = date.today()
+            if len(sys.argv) >= 5:
+                start_date = datetime.strptime(sys.argv[4], "%Y-%m-%d").date()
+            end_date = start_date + timedelta(days=1)
+            if len(sys.argv) >= 6:
+                end_date = datetime.strptime(sys.argv[5], "%Y-%m-%d").date()
+            generate_datasets(
+                task_data_dir,
+                train_dataset_dir, val_dataset_dir,
+                (start_date, end_date),
+            )
     elif mode == "train":
         task_train_dir = storage_dir / "train" / task_name
         run_train_dir = task_train_dir / datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -69,6 +83,9 @@ def main():
         elif task_name == EXTRACTION_TASK:
             from crystal.extraction.train import train
             train(train_dataset_dir, val_dataset_dir, run_train_dir)
+        elif task_name == HAIKU_TASK:
+            from crystal.haiku.train import train
+            train(train_dataset_dir, val_dataset_dir, run_train_dir)
     elif mode == "eval":
         if task_name == SUMMARIZATION_TASK:
             from crystal.summarization.eval import eval
@@ -78,6 +95,9 @@ def main():
             eval(sys.argv[4])
         elif task_name == EXTRACTION_TASK:
             from crystal.extraction.eval import eval
+            eval(sys.argv[4], val_dataset_dir)
+        elif task_name == HAIKU_TASK:
+            from crystal.haiku.eval import eval
             eval(sys.argv[4], val_dataset_dir)
 
 
