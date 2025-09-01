@@ -1,4 +1,8 @@
-FROM python:3.12.9-bookworm
+FROM python:3.12.11-bookworm
+
+# Install dependencies
+RUN apt-get update -y
+RUN apt-get install -y cmake
 
 # Install uv
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN curl -LsSf https://astral.sh/uv/0.8.4/install.sh | sh

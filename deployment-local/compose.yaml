@@ -1,35 +1,10 @@
 services:
-  #############
-  # llama.cpp
-  #############
-  llamacpp-init:
-    image: curlimages/curl:8.12.1
-    volumes:
-      - ../llamacpp-init/:/usr/local/src/crystal/llamacpp-init/:ro
-      - ../storage/models/:/usr/local/src/crystal/storage/models/
-    entrypoint: []
-    # Use a small model in local environment
-    command: ["/usr/local/src/crystal/llamacpp-init/download_model.sh", "https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF/resolve/21ef230/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf", "/usr/local/src/crystal/storage/models/model.gguf"]
-  llamacpp-server:
-    image: ghcr.io/ggml-org/llama.cpp:server-b4927
-    depends_on:
-      llamacpp-init:
-        condition: service_completed_successfully
-    volumes:
-      - ../storage/models/:/usr/local/src/crystal/storage/models/:ro
-    command: ["-m", "/usr/local/src/crystal/storage/models/model.gguf", "--temp", "0", "--port", "8080"]
-  ###########
-  # Crystal
-  ###########
   crystal-ai:
     platform: linux/amd64
     build:
       context: ../crystal-ai/
       dockerfile: Dockerfile.local
     environment:
-      - CHLORIA_API_KEY=${CHLORIA_API_KEY}
-      - CHLORIA_API_SECRET=${CHLORIA_API_SECRET}
-      - LLAMACPP_SERVER_ROOT_ENDPOINT=http://llamacpp_server:8080
       - CRYSTAL_LOG_LEVEL=info
     volumes:
       - ../:/usr/local/src/crystal/

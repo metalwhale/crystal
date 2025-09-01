@@ -1,104 +1,46 @@
+import argparse
+import datetime
 import logging
 import os
-import sys
-from datetime import date, datetime, timedelta
-from pathlib import Path
+import pathlib
 
-
-SUMMARIZATION_TASK = "summarization"
-CHATBOT_TASK = "chatbot"
-EXTRACTION_TASK = "extraction"
-HAIKU_TASK = "haiku"
+from dotenv import load_dotenv
 
 
 def main():
+    load_dotenv()
     logging.basicConfig()
-    mode, task_name, storage_dir = sys.argv[1:4]
-    storage_dir = Path(storage_dir)
-    task_dataset_dir = storage_dir / "dataset" / task_name
-    train_dataset_dir = task_dataset_dir / "train"
-    val_dataset_dir = task_dataset_dir / "val"
-    test_dataset_dir = task_dataset_dir / "test"
+    # Config the argument parser
+    parser = argparse.ArgumentParser(description="Crystal AI")
+    subparsers = parser.add_subparsers(dest="command", required=True, help="Available commands")
+    subparsers.add_parser("data", help="Generate data")
+    subparsers.add_parser("train", help="Train the model")
+    evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate the model")
+    evaluate_parser.add_argument("--lora-dir", required=True, help="Path to the trained LoRA subdirectory")
+    args = parser.parse_args()
+    # Create dataset directories
+    storage_dir = pathlib.Path(__file__).resolve().parent.parent / "storage"
+    train_dataset_dir = storage_dir / "dataset" / "train"
+    val_dataset_dir = storage_dir / "dataset" / "val"
     os.makedirs(train_dataset_dir, exist_ok=True)
     os.makedirs(val_dataset_dir, exist_ok=True)
-    os.makedirs(test_dataset_dir, exist_ok=True)
-    if mode == "data":
-        task_data_dir = storage_dir / "data" / task_name
-        os.makedirs(task_data_dir, exist_ok=True)
-        if task_name == SUMMARIZATION_TASK:
-            from crystal.summarization.data import generate_datasets
-            start_date = date.today()
-            if len(sys.argv) >= 5:
-                start_date = datetime.strptime(sys.argv[4], "%Y-%m-%d").date()
-            end_date = start_date + timedelta(days=1)
-            if len(sys.argv) >= 6:
-                end_date = datetime.strptime(sys.argv[5], "%Y-%m-%d").date()
-            generate_datasets(
-                task_data_dir,
-                train_dataset_dir, val_dataset_dir, test_dataset_dir,
-                (start_date, end_date),
-            )
-        elif task_name == CHATBOT_TASK:
-            from crystal.chatbot.data import generate_datasets
-            generate_datasets(
-                task_data_dir,
-                train_dataset_dir, val_dataset_dir,
-            )
-        elif task_name == EXTRACTION_TASK:
-            from crystal.extraction.data import generate_datasets
-            start_date = date.today()
-            if len(sys.argv) >= 5:
-                start_date = datetime.strptime(sys.argv[4], "%Y-%m-%d").date()
-            end_date = start_date + timedelta(days=1)
-            if len(sys.argv) >= 6:
-                end_date = datetime.strptime(sys.argv[5], "%Y-%m-%d").date()
-            generate_datasets(
-                task_data_dir,
-                train_dataset_dir, val_dataset_dir,
-                (start_date, end_date),
-            )
-        elif task_name == HAIKU_TASK:
-            from crystal.haiku.data import generate_datasets
-            start_date = date.today()
-            if len(sys.argv) >= 5:
-                start_date = datetime.strptime(sys.argv[4], "%Y-%m-%d").date()
-            end_date = start_date + timedelta(days=1)
-            if len(sys.argv) >= 6:
-                end_date = datetime.strptime(sys.argv[5], "%Y-%m-%d").date()
-            generate_datasets(
-                task_data_dir,
-                train_dataset_dir, val_dataset_dir,
-                (start_date, end_date),
-            )
-    elif mode == "train":
-        task_train_dir = storage_dir / "train" / task_name
-        run_train_dir = task_train_dir / datetime.now().strftime("%Y%m%d-%H%M%S")
-        os.makedirs(run_train_dir, exist_ok=True)
-        if task_name == SUMMARIZATION_TASK:
-            from crystal.summarization.train import train
-            train(train_dataset_dir, val_dataset_dir, run_train_dir)
-        elif task_name == CHATBOT_TASK:
-            from crystal.chatbot.train import train
-            train(train_dataset_dir, val_dataset_dir, run_train_dir)
-        elif task_name == EXTRACTION_TASK:
-            from crystal.extraction.train import train
-            train(train_dataset_dir, val_dataset_dir, run_train_dir)
-        elif task_name == HAIKU_TASK:
-            from crystal.haiku.train import train
-            train(train_dataset_dir, val_dataset_dir, run_train_dir)
-    elif mode == "eval":
-        if task_name == SUMMARIZATION_TASK:
-            from crystal.summarization.eval import eval
-            eval(sys.argv[4])
-        elif task_name == CHATBOT_TASK:
-            from crystal.chatbot.eval import eval
-            eval(sys.argv[4])
-        elif task_name == EXTRACTION_TASK:
-            from crystal.extraction.eval import eval
-            eval(sys.argv[4], val_dataset_dir)
-        elif task_name == HAIKU_TASK:
-            from crystal.haiku.eval import eval
-            eval(sys.argv[4], val_dataset_dir)
+    # Parse the arguments
+    if args.command == "data":
+        from crystal.data import fetch_data, generate_datasets
+
+        data_dir = storage_dir / "data"
+        os.makedirs(data_dir, exist_ok=True)
+        fetch_data(data_dir)
+        generate_datasets(data_dir, train_dataset_dir, val_dataset_dir)
+    elif args.command == "train":
+        from crystal.train import train
+
+        run_train_dir = storage_dir / "train" / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        train(train_dataset_dir, val_dataset_dir, run_train_dir)
+    elif args.command == "evaluate":
+        from crystal.train import evaluate
+
+        evaluate(args.lora_dir, val_dataset_dir)
 
 
 if __name__ == "__main__":
