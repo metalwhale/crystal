@@ -51,8 +51,6 @@ CRySTAL: Condensed Reinforcement using Structured Training for Adaptive Learning
     ```
     Train the model (`nohup` keeps the program running even after exiting the terminal):
     ```bash
-    uv run python -c 'import nltk; nltk.download("cmudict")'
-
     # When running the program, mysterious `core.*` files are somehow created. I'm not sure what causes this and it's quite annoying.
     # Here we are temporarily disabling core dumps, but I want to take a closer look later.
     ulimit -c 0
